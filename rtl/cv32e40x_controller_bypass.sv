@@ -96,12 +96,16 @@ module cv32e40x_controller_bypass import cv32e40x_pkg::*;
   logic csr_write_in_ex_wb;
 
   // Detect when a CSR read is in ID
-  assign csr_read_in_id = (csr_en_id_i && (csr_op_id_i != CSR_OP_WRITE)) ||
+  // This is _very_ conservative, always stalling if CSR in ID and CSR in
+          // either EX or WB.
+          // TODO:OK: Optimize for cases like multiple PMP CSR writes
+          // Checking for CSR addr and rd value.
+  assign csr_read_in_id = (csr_en_id_i /*&& (csr_op_id_i != CSR_OP_WRITE)*/) ||
                           (mret_id_i || dret_id_i) && if_id_pipe_i.instr_valid;
 
   // Detect when a CSR write in in EX or WB TODO:OK:Add checks for CSR addr 
-  assign csr_write_in_ex_wb = (id_ex_pipe_i.instr_valid && (id_ex_pipe_i.csr_en && (id_ex_pipe_i.csr_op != CSR_OP_READ)) ||
-                              ((ex_wb_pipe_i.csr_en && (ex_wb_pipe_i.csr_op != CSR_OP_READ)) ||
+  assign csr_write_in_ex_wb = (id_ex_pipe_i.instr_valid && (id_ex_pipe_i.csr_en) ||
+                              ((ex_wb_pipe_i.csr_en) ||
                               (ex_wb_pipe_i.mret_insn || ex_wb_pipe_i.dret_insn)) &&
                               ex_wb_pipe_i.instr_valid);
 
