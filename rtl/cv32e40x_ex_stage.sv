@@ -100,7 +100,7 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
   logic [5:0]     div_shift_amt;
   logic [31:0]    div_op_a_shifted;
 
-  assign instr_valid = id_ex_pipe_i.instr_valid && !ctrl_fsm_i.kill_ex; // todo: why does halt_ex not factor in here just like in LSU?
+  assign instr_valid = id_ex_pipe_i.instr_valid && !ctrl_fsm_i.kill_ex && !ctrl_fsm_i.halt_ex; // todo: why does halt_ex not factor in here just like in LSU?
 //  assign instr_valid = id_ex_pipe_i.instr_valid && !ctrl_fsm_i.kill_ex && !ctrl_fsm_i.halt_ex; // todo: This gives SEC error
  
   assign mul_en_gated = id_ex_pipe_i.mul_en && instr_valid;
@@ -340,6 +340,6 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
                        (id_ex_pipe_i.div_en && div_valid) ||
                        (id_ex_pipe_i.csr_en && csr_valid) ||
                        previous_exception // todo:ab:remove
-                      ) && instr_valid && !ctrl_fsm_i.halt_ex;
+                      ) && instr_valid;
 
 endmodule // cv32e40x_ex_stage

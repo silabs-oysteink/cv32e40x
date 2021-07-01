@@ -343,7 +343,7 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
   // output to register file
   assign lsu_rdata_1_o = (resp_valid == 1'b1) ? rdata_ext : rdata_q;
 
-  assign misaligned_st = id_ex_pipe_i.lsu_misaligned;
+  assign misaligned_st = id_ex_pipe_i.lsu_misaligned; // todo: rename
 
   // Note: PMP is not fully supported at the moment (not even if USE_PMP = 1)
   assign load_err_o      = 1'b0; // Not currently used
@@ -409,7 +409,8 @@ module cv32e40x_load_store_unit import cv32e40x_pkg::*;
 
   // LSU second stage is valid when resp_valid (typically data_rvalid_i) is received. For a misaligned
   // load/store only its second phase is marked as valid.
-  assign valid_1_o = (cnt_q == 2'b00) ? 1'b0 : !lsu_misaligned_0_o && resp_valid && valid_1_i; // todo:AB (cnt_q == 2'b00) should be same as !WB.lsu_en
+  // todo: make WB timing version of misaligned_st
+  assign valid_1_o = (cnt_q == 2'b00) ? 1'b0 : /*!lsu_misaligned_0_o*/ !misaligned_st && resp_valid && valid_1_i; // todo:AB (cnt_q == 2'b00) should be same as !WB.lsu_en
 
   // LSU EX stage readyness requires two criteria to be met:
   // 

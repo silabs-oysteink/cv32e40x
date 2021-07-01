@@ -60,6 +60,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   input  logic        lsu_err_wb_i,               // LSU caused bus_error in WB stage
   input  logic [31:0] lsu_addr_wb_i,              // LSU address in WB stage
   input  logic        lsu_en_wb_i,                // LSU data is written back in WB
+  input  logic        wb_valid_i,                 // WB stage is valid. Caution! Factors in data_rvalid_i
 
   // Interrupt Controller Signals
   input  logic        irq_req_ctrl_i,             // irq requst
@@ -243,7 +244,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
                               !id_ex_pipe_i.lsu_misaligned)) && !debug_mode_q;
                                
   // Performance counter events
-  assign ctrl_fsm_o.mhpmevent.minstret = ex_wb_pipe_i.instr_valid && !exception_in_wb && !ctrl_fsm_o.kill_wb && !ctrl_fsm_o.halt_wb; // todo: Should maybe use wb_stage local instr_valid, as the current code remakes that here.
+  assign ctrl_fsm_o.mhpmevent.minstret = wb_valid_i && !exception_in_wb;//ex_wb_pipe_i.instr_valid && !exception_in_wb && !ctrl_fsm_o.kill_wb && !ctrl_fsm_o.halt_wb; // todo: Should maybe use wb_stage local instr_valid, as the current code remakes that here.
   assign ctrl_fsm_o.mhpmevent.load = 1'b0; // todo:low
   assign ctrl_fsm_o.mhpmevent.store = 1'b0; // todo:low
   assign ctrl_fsm_o.mhpmevent.jump = 1'b0; // todo:low
@@ -554,7 +555,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
           ctrl_fsm_o.kill_if = 1'b1;
           ctrl_fsm_o.kill_id = 1'b0;
           ctrl_fsm_o.kill_ex = 1'b0;
-          ctrl_fsm_o.kill_wb = 1'b0;
+          ctrl_fsm_o.kill_wb = exception_in_wb; // Kill if exception (not for reagular ebreak?)
 
           // Should use pc from IF (next insn, as if is halted after first issue)
           // Exception for single step + ebreak, as addr of ebreak (in WB) shall be stored
@@ -572,7 +573,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
           ctrl_fsm_o.kill_if = 1'b1;
           ctrl_fsm_o.kill_id = 1'b1;
           ctrl_fsm_o.kill_ex = 1'b1;
-          ctrl_fsm_o.kill_wb = !debug_mode_q;
+          ctrl_fsm_o.kill_wb = !ebreak_in_wb; // Ebreak that caues debug entry should not be killed, otherwise RVFI will skip it.
 
           // Save pc from oldest valid instruction
           if (ex_wb_pipe_i.instr_valid) begin

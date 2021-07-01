@@ -185,6 +185,7 @@ module cv32e40x_core import cv32e40x_pkg::*;
   // Stage valid signals
   logic        if_valid;
   logic        ex_valid;
+  logic        wb_valid;
 
   // Interrupts
   logic        m_irq_enable; // interrupt_controller
@@ -556,7 +557,8 @@ module cv32e40x_core import cv32e40x_pkg::*;
     .lsu_ready_i                ( lsu_ready_1                  ),
   
     // Valid/ready
-    .wb_ready_o                 ( wb_ready                     )
+    .wb_ready_o                 ( wb_ready                     ),
+    .wb_valid_o                 ( wb_valid                     )
   );
 
   //////////////////////////////////////
@@ -698,6 +700,7 @@ module cv32e40x_core import cv32e40x_pkg::*;
 
     .id_ready_i                     ( id_ready               ),
     .ex_valid_i                     ( ex_valid               ),
+    .wb_valid_i                     ( wb_valid               ),
     .wb_ready_i                     ( wb_ready               ),
 
     .obi_data_req_i                 ( data_req_o             ),

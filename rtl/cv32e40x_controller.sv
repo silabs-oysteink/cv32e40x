@@ -92,6 +92,7 @@ module cv32e40x_controller import cv32e40x_pkg::*;
   input  logic        id_ready_i,               // ID stage is ready
   input  logic        ex_valid_i,               // EX stage is done
   input  logic        wb_ready_i,               // WB stage is ready
+  input  logic        wb_valid_i,               // WB stage is done
 
   input  logic        lsu_en_wb_i,              // LSU data is written back in WB
   input  logic        obi_data_req_i,           // OBI bus data request (EX) // todo: Should look at 'trans' (goal (please check if true) it to not break a multicycle LSU instruction or already committed load/store; that cannot be judged by only looking at the OBI signals)
@@ -136,6 +137,7 @@ module cv32e40x_controller import cv32e40x_pkg::*;
     .lsu_addr_wb_i               ( lsu_addr_wb_i            ),
     .lsu_en_wb_i                 ( lsu_en_wb_i              ),
     .wb_ready_i                  ( wb_ready_i               ),
+    .wb_valid_i                  ( wb_valid_i               ),
 
     // Interrupt Controller Signals
     .irq_req_ctrl_i              ( irq_req_ctrl_i           ),
