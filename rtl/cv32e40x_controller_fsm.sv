@@ -217,7 +217,24 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   assign single_step_allowed = !(id_ex_pipe_i.lsu_misaligned && id_ex_pipe_i.instr_valid) && !obi_data_req_q;
                              
   // Single step are mutually exclusive from any other reason to enter debug
-  assign pending_single_step = (!debug_mode_q && debug_single_step_i && ex_wb_pipe_i.instr_valid) && !pending_debug;
+  /*
+  Debug spec 1.0.0 (unratified as of Aug 9th '21)
+  "If control is transferred to a trap handler while executing the instruction, then Debug Mode is
+  re-entered immediately after the PC is changed to the trap handler, and the appropriate tval and
+  cause registers are updated. In this case none of the trap handler is executed, and if the cause was
+  a pending interrupt no instructions might be executed at all."
+
+  Hence, a pending_single_step is asserted if we take an interrupt when we should be stepping.
+  For any interruptible instructions (non-LSU), at any stage, we would kill the instruction and jump
+  to debug mode without executing any instructions. Interrupt handler's first instruction will be in dpc.
+
+  For LSU instructions that may not be killed (if they reach WB of stay in EX for >1 cycles),
+  we are not allowed to take interrupts, and we will re-enter debug mode after finishing the LSU.
+  Interrupt will then be taken when we enter the next step.
+  */
+  assign pending_single_step = ((!debug_mode_q && debug_single_step_i && ex_wb_pipe_i.instr_valid) ||
+                                (!debug_mode_q && debug_single_step_i && ctrl_fsm_o.irq_ack))
+                                && !pending_debug;
 
   // Regular debug will kill insn in WB, do not allow for LSU in WB as insn must finish with rvalid
   // or for any case where a LSU in EX has asserted its obi data_req for at least one cycle.
@@ -399,6 +416,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
             ctrl_fsm_o.halt_id = 1'b1;
           end
         // IRQ
+          // Todo: if(pending_interrupt && interrupt_allowed)
         end else if (pending_interrupt) begin
           if (interrupt_allowed) begin
             ctrl_fsm_o.kill_if = 1'b1;
@@ -430,14 +448,12 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
               ctrl_fsm_o.csr_save_if = 1'b1;
             end
 
-            // Unstall IF in case of single stepping
-            if (debug_single_step_i) begin
-              single_step_halt_if_n = 1'b0;
-            end
           end else begin // !interrupt_allowed
             // Halt ID to allow interrupt on bubble later. This assumes that it is okay to interrupt
             // any multi-cycle ID instruction in the middle.
             // TODO:low Consider effect of halting EX instead, could gain 1 cycle latency
+            // TODO: Make halting of ID parallell, otherwise we will miss handling events in EX/WB
+            // while an interrupt is pending but not allowed (and interrupt may possibly retract before taken)
             ctrl_fsm_o.halt_id = 1'b1;
           end
         end else begin
@@ -586,8 +602,8 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
           // Only kill IF. WB should be allowed to complete
           // ID and EX are empty as IF is blocked after one issue in single step mode
           ctrl_fsm_o.kill_if = 1'b1;
-          ctrl_fsm_o.kill_id = 1'b0;
-          ctrl_fsm_o.kill_ex = 1'b0;
+          ctrl_fsm_o.kill_id = if_id_pipe_i.instr_valid;
+          ctrl_fsm_o.kill_ex = id_ex_pipe_i.instr_valid;
           ctrl_fsm_o.kill_wb = 1'b0;
 
           // Should use pc from IF (next insn, as if is halted after first issue)

@@ -153,13 +153,13 @@ module cv32e40x_controller_fsm_sva
   assert property (@(posedge clk)
           (ex_wb_pipe_i.wfi_insn && ex_wb_pipe_i.instr_valid) |-> !(id_ex_pipe_i.lsu_en) )
     else `uvm_error("controller", "LSU instruction follows WFI")
-
+/*
   // Check that no instructions are valid in ID or EX when a single step is taken
   a_single_step_pipecheck :
     assert property (@(posedge clk)
             (pending_single_step && (ctrl_fsm_ns == DEBUG_TAKEN)) |-> (!id_ex_pipe_i.instr_valid && !if_id_pipe_i.instr_valid))
       else `uvm_error("controller", "ID and EX not empty when when single step is taken")
-
+*/
   // Check trigger match never happens during debug_mode
   a_trigger_match_in_debug :
     assert property (@(posedge clk)

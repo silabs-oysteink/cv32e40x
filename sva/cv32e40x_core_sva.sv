@@ -264,7 +264,7 @@ always_ff @(posedge clk , negedge rst_ni)
                      ##1 inst_taken [->1]
                      |-> (ctrl_fsm.debug_mode && debug_single_step))
       else `uvm_error("core", "Assertion a_single_step_no_irq failed")
-
+/*
   // Single step with interrupt taken may issue up to two instructions
   // before entering debug mode
   a_single_step_with_irq :
@@ -273,7 +273,7 @@ always_ff @(posedge clk , negedge rst_ni)
                       ##1 inst_taken [->1]
                       |-> (ctrl_fsm.debug_mode && debug_single_step))
       else `uvm_error("core", "Assertion a_single_step_with_irq failed")
-
+*/
   // Check that only a single instruction can retire during single step
   a_single_step_retire :
     assert property (@(posedge clk) disable iff (!rst_ni)
@@ -281,6 +281,15 @@ always_ff @(posedge clk , negedge rst_ni)
                       ##1 wb_valid [->1]
                       |-> (ctrl_fsm.debug_mode && debug_single_step))
       else `uvm_error("core", "Multiple instructions retired during single stepping")
-  
+
+
+
+  // Check that no instructions retire if an interrupt is taken during a step
+  a_single_step_irq_noretire :
+  assert property (@(posedge clk) disable iff (!rst_ni)
+                    (debug_single_step && !ctrl_fsm.debug_mode && (irq_ack_o))
+                    |=> (!wb_valid until ctrl_fsm.debug_mode))
+    else `uvm_error("core", "Interrupt taken during step should not retire any instructions")
+
 endmodule // cv32e40x_core_sva
 
