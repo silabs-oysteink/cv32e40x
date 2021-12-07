@@ -143,6 +143,8 @@ module cv32e40x_wrapper
   bind cv32e40x_id_stage:
     core_i.id_stage_i cv32e40x_id_stage_sva id_stage_sva
     (
+      .if_valid_i   (core_i.if_stage_i.if_valid_o   ),
+      .ctrl_byp_i   (core_i.ctrl_byp),
       .*
     );
 
@@ -164,11 +166,11 @@ module cv32e40x_wrapper
     core_i.id_stage_i
     cv32e40x_dbg_helper
       dbg_help_i(.is_compressed(if_id_pipe_i.instr_meta.compressed),
-                 .rf_re    (core_i.rf_re_id               ),
-                 .rf_raddr (core_i.rf_raddr_id            ),
-                 .rf_we    (core_i.id_stage_i.rf_we       ),
-                 .rf_waddr (core_i.rf_waddr_id            ),
-                 .illegal_insn (core_i.id_stage_i.illegal_insn       ),
+                 .rf_re        (core_i.rf_re_id                ),
+                 .rf_raddr     (core_i.rf_raddr_id             ),
+                 .rf_we        (core_i.id_stage_i.rf_we        ),
+                 .rf_waddr     (core_i.rf_waddr_id             ),
+                 .illegal_insn (core_i.id_stage_i.illegal_insn ),
                  .*);
 
   bind cv32e40x_mult:            core_i.ex_stage_i.mult_i           cv32e40x_mult_sva         mult_sva         (.*);

@@ -45,6 +45,7 @@ module cv32e40x_i_decoder import cv32e40x_pkg::*;
     decoder_ctrl_o              = DECODER_CTRL_ILLEGAL_INSN;
     decoder_ctrl_o.illegal_insn = 1'b0;
     decoder_ctrl_o.alu_en       = 1'b1;
+    decoder_ctrl_o.rf_re        = 2'b00;
 
     unique case (instr_rdata_i[6:0])
 
@@ -231,6 +232,7 @@ module cv32e40x_i_decoder import cv32e40x_pkg::*;
           decoder_ctrl_o.rf_we    = 1'b1;
           decoder_ctrl_o.rf_re[0] = 1'b1;
 
+          // TODO: Can this be non-zero?
           if (~instr_rdata_i[28]) decoder_ctrl_o.rf_re[1] = 1'b1;
 
           unique case ({instr_rdata_i[30:25], instr_rdata_i[14:12]})

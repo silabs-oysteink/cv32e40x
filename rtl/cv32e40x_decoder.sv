@@ -222,5 +222,7 @@ module cv32e40x_decoder import cv32e40x_pkg::*;
   assign ctrl_transfer_insn_raw_o = ctrl_transfer_insn;
   assign rf_we_raw_o              = rf_we;
   assign lsu_en_raw_o             = lsu_en;
+
+  
   
 endmodule // cv32e40x_decoder

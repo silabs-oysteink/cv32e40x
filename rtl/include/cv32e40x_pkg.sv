@@ -949,6 +949,10 @@ typedef struct packed {
   logic        instr_valid;
   inst_resp_t  instr;
   instr_meta_t instr_meta;
+  rf_addr_t    rs1;
+  rf_addr_t    rs2;
+  logic        rs1_enable;
+  logic        rs2_enable;
   logic [31:0] pc;
   logic [15:0] compressed_instr;
   logic        illegal_c_insn;

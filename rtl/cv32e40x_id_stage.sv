@@ -219,8 +219,8 @@ module cv32e40x_id_stage import cv32e40x_pkg::*;
   //---------------------------------------------------------------------------
   // Source register selection
   //---------------------------------------------------------------------------
-  assign rf_raddr_o[0] = instr[REG_S1_MSB:REG_S1_LSB];
-  assign rf_raddr_o[1] = instr[REG_S2_MSB:REG_S2_LSB];
+  assign rf_raddr_o[0] = if_id_pipe_i.rs1;
+  assign rf_raddr_o[1] = if_id_pipe_i.rs2;
 
   // Assign rs3 address if Xif mandates three read ports
   generate

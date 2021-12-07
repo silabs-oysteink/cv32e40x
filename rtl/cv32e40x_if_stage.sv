@@ -102,9 +102,12 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
   inst_resp_t        prefetch_instr;
 
   logic              illegal_c_insn;
+  logic              illegal_u_insn;
 
   inst_resp_t        instr_decompressed;
   logic              instr_compressed_int;
+  logic              rs1_enable;
+  logic              rs2_enable;
 
   // Transaction signals to/from obi interface
   logic              prefetch_resp_valid;
@@ -281,6 +284,10 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
       if_id_pipe_o.compressed_instr <= '0;
       if_id_pipe_o.trigger_match    <= 1'b0;
       if_id_pipe_o.xif_id           <= '0;
+      if_id_pipe_o.rs1              <= '0;
+      if_id_pipe_o.rs2              <= '0;
+      if_id_pipe_o.rs1_enable       <= 1'b0;
+      if_id_pipe_o.rs2_enable       <= 1'b0;
     end
     else
     begin
@@ -289,13 +296,39 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
       if (if_valid_o && id_ready_i)
       begin
         if_id_pipe_o.instr_valid      <= 1'b1;
-        if_id_pipe_o.instr            <= instr_decompressed;
+        // Parts of instr is ungated, fields related to rs1/rs2 are gated further down
+        if_id_pipe_o.instr.mpu_status                <= instr_decompressed.mpu_status;
+        if_id_pipe_o.instr.bus_resp.err              <= instr_decompressed.bus_resp.err;
+        if_id_pipe_o.instr.bus_resp.rdata[31:25]     <= instr_decompressed.bus_resp.rdata[31:25];
+        if_id_pipe_o.instr.bus_resp.rdata[14:0]      <= instr_decompressed.bus_resp.rdata[14:0];
         if_id_pipe_o.instr_meta       <= instr_meta_n;
         if_id_pipe_o.illegal_c_insn   <= illegal_c_insn;
         if_id_pipe_o.pc               <= pc_if_o;
+        // TODO: could be clock gated based on compressed/uncompressed to save power
         if_id_pipe_o.compressed_instr <= prefetch_instr.bus_resp.rdata[15:0];
         if_id_pipe_o.trigger_match    <= trigger_match_i;
         if_id_pipe_o.xif_id           <= xif_id;
+        if_id_pipe_o.rs1_enable       <= rs1_enable;
+        if_id_pipe_o.rs2_enable       <= rs2_enable;
+
+        // Only update rs1 if rs1 is acutally used. Otherwise update the instr field
+        if(rs1_enable) begin
+          if_id_pipe_o.rs1            <= instr_decompressed.bus_resp.rdata[19:15];
+        end
+
+        if(!rs1_enable || (rs1_enable && illegal_u_insn)) begin
+          if_id_pipe_o.instr.bus_resp.rdata[19:15]   <= instr_decompressed.bus_resp.rdata[19:15];
+        end
+
+        // Only update rs2 if rs2 is acutally used. Otherwise update the instr field
+        if(rs2_enable) begin
+          if_id_pipe_o.rs2            <= instr_decompressed.bus_resp.rdata[24:20];
+        end
+
+        if (!rs2_enable || (rs2_enable && illegal_u_insn)) begin
+          if_id_pipe_o.instr.bus_resp.rdata[24:20]   <= instr_decompressed.bus_resp.rdata[24:20];
+        end
+        
       end else if (id_ready_i) begin
         if_id_pipe_o.instr_valid      <= 1'b0;
       end
@@ -308,7 +341,11 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
     .instr_i         ( prefetch_instr          ),
     .instr_o         ( instr_decompressed      ),
     .is_compressed_o ( instr_compressed_int    ),
-    .illegal_instr_o ( illegal_c_insn          )
+    .illegal_instr_o ( illegal_c_insn          ),
+    .illegal_uncompressed_o( illegal_u_insn    ),
+    .rs1_enable      ( rs1_enable              ),
+    .rs2_enable      ( rs2_enable              ),
+    .ctrl_fsm_i      ( ctrl_fsm_i              )
   );
 
 
