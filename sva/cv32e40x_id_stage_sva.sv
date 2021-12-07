@@ -128,6 +128,18 @@ module cv32e40x_id_stage_sva
                       (ctrl_fsm_i.kill_id)
                       |-> (id_ready_o && !id_valid_o))
       else `uvm_error("id_stage", "Kill should imply ready and not valid")
+  /*
+  // Predecoded rs1/2_enable shall always equal rf_re from the main decoder
+  a_predecoded_rf_re :
+  assert property (@(posedge clk) disable iff (!rst_n)
+                    (if_valid_i && id_ready_o) |=> rf_re == {if_id_pipe_i.rs2_enable, if_id_pipe_i.rs1_enable})
+    else `uvm_error("id_stage", "Predecoded rf_re does not match decoder rf_re")
+  */
+  // rs2_enable can only be 1 if rs1_enable is also 1
+  a_rs2_and_rs1 :
+  assert property (@(posedge clk) disable iff (!rst_n)
+                    (if_id_pipe_i.rs2_enable |-> if_id_pipe_i.rs1_enable))
+    else `uvm_error("id_stage", "rs2_enable == 1 while rs1_enable == 0")
 
 
 endmodule // cv32e40x_id_stage_sva

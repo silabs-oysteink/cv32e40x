@@ -105,6 +105,8 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
 
   inst_resp_t        instr_decompressed;
   logic              instr_compressed_int;
+  logic              rs1_enable;
+  logic              rs2_enable;
 
   // Transaction signals to/from obi interface
   logic              prefetch_resp_valid;
@@ -281,6 +283,10 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
       if_id_pipe_o.compressed_instr <= '0;
       if_id_pipe_o.trigger_match    <= 1'b0;
       if_id_pipe_o.xif_id           <= '0;
+      if_id_pipe_o.rs1_enable       <= 1'b0;
+      if_id_pipe_o.rs2_enable       <= 1'b0;
+      if_id_pipe_o.rs1              <= '0;
+      if_id_pipe_o.rs2              <= '0;
     end
     else
     begin
@@ -296,6 +302,16 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
         if_id_pipe_o.compressed_instr <= prefetch_instr.bus_resp.rdata[15:0];
         if_id_pipe_o.trigger_match    <= trigger_match_i;
         if_id_pipe_o.xif_id           <= xif_id;
+        if_id_pipe_o.rs1_enable       <= rs1_enable;
+        if_id_pipe_o.rs2_enable       <= rs2_enable;
+
+        if(rs1_enable) begin
+          if_id_pipe_o.rs1 <= instr_decompressed.bus_resp.rdata[19:15];
+        end
+
+        if(rs2_enable) begin
+          if_id_pipe_o.rs2 <= instr_decompressed.bus_resp.rdata[24:20];
+        end
       end else if (id_ready_i) begin
         if_id_pipe_o.instr_valid      <= 1'b0;
       end
@@ -308,7 +324,9 @@ module cv32e40x_if_stage import cv32e40x_pkg::*;
     .instr_i         ( prefetch_instr          ),
     .instr_o         ( instr_decompressed      ),
     .is_compressed_o ( instr_compressed_int    ),
-    .illegal_instr_o ( illegal_c_insn          )
+    .illegal_instr_o ( illegal_c_insn          ),
+    .rs1_enable      ( rs1_enable              ),
+    .rs2_enable      ( rs2_enable              )
   );
 
 

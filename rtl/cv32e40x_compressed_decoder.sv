@@ -29,7 +29,9 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
   input  inst_resp_t  instr_i,
   output inst_resp_t  instr_o,
   output logic        is_compressed_o,
-  output logic        illegal_instr_o
+  output logic        illegal_instr_o,
+  output logic        rs1_enable,
+  output logic        rs2_enable
 );
 
   import cv32e40x_pkg::*;
@@ -50,6 +52,8 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
   begin
     illegal_instr_o  = 1'b0;
     instr_o          = instr_i;
+    rs1_enable       = 1'b0;
+    rs2_enable       = 1'b0;
 
     unique case (instr[1:0])
       // C0
@@ -58,17 +62,26 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
           3'b000: begin
             // c.addi4spn -> addi rd', x2, imm
             instr_o.bus_resp.rdata = {2'b0, instr[10:7], instr[12:11], instr[5], instr[6], 2'b00, 5'h02, 3'b000, 2'b01, instr[4:2], OPCODE_OPIMM};
-            if (instr[12:5] == 8'b0)  illegal_instr_o = 1'b1;
+            if (instr[12:5] == 8'b0) begin
+              illegal_instr_o = 1'b1;
+              rs1_enable = 1'b1;
+              rs2_enable = 1'b1;
+            end else begin
+              rs1_enable = 1'b1;
+            end
           end
 
           3'b010: begin
             // c.lw -> lw rd', imm(rs1')
             instr_o.bus_resp.rdata = {5'b0, instr[5], instr[12:10], instr[6], 2'b00, 2'b01, instr[9:7], 3'b010, 2'b01, instr[4:2], OPCODE_LOAD};
+            rs1_enable = 1'b1;
           end
 
           3'b110: begin
             // c.sw -> sw rs2', imm(rs1')
             instr_o.bus_resp.rdata = {5'b0, instr[5], instr[12], 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b010, instr[11:10], instr[6], 2'b00, OPCODE_STORE};
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
 
           3'b001,       // c.fld -> fld rd', imm(rs1')
@@ -76,11 +89,13 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
           3'b101,       // c.fsd -> fsd rs2', imm(rs1')
           3'b111: begin // c.fsw -> fsw rs2', imm(rs1')
             illegal_instr_o = 1'b1;
-            instr_o.bus_resp.rdata = {5'b0, instr[5], instr[12:10], instr[6], 2'b00, 2'b01, instr[9:7], 3'b010, 2'b01, instr[4:2], OPCODE_LOAD};
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
           default: begin
-            instr_o.bus_resp.rdata = {5'b0, instr[5], instr[12:10], instr[6], 2'b00, 2'b01, instr[9:7], 3'b010, 2'b01, instr[4:2], OPCODE_LOAD};
             illegal_instr_o = 1'b1;
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
         endcase
       end
@@ -93,6 +108,7 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
             // c.addi -> addi rd, rd, nzimm
             // c.nop
             instr_o.bus_resp.rdata = {{6 {instr[12]}}, instr[12], instr[6:2], instr[11:7], 3'b0, instr[11:7], OPCODE_OPIMM};
+            rs1_enable = 1'b1;
           end
 
           3'b001, 3'b101: begin
@@ -105,20 +121,24 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
             if (instr[11:7] == 5'b0) begin
               // Hint -> addi x0, x0, nzimm
               instr_o.bus_resp.rdata = {{6 {instr[12]}}, instr[12], instr[6:2], 5'b0, 3'b0, instr[11:7], OPCODE_OPIMM};
+              rs1_enable = 1'b1;
             end else begin
               // c.li -> addi rd, x0, nzimm
               instr_o.bus_resp.rdata = {{6 {instr[12]}}, instr[12], instr[6:2], 5'b0, 3'b0, instr[11:7], OPCODE_OPIMM};
+              rs1_enable = 1'b1;
             end
           end
 
           3'b011: begin
             if ({instr[12], instr[6:2]} == 6'b0) begin
-              instr_o.bus_resp.rdata = {{15 {instr[12]}}, instr[6:2], instr[11:7], OPCODE_LUI};
               illegal_instr_o = 1'b1;
+              rs1_enable      = 1'b1;
+              rs2_enable      = 1'b1;
             end else begin
               if (instr[11:7] == 5'h02) begin
                 // c.addi16sp -> addi x2, x2, nzimm
                 instr_o.bus_resp.rdata = {{3 {instr[12]}}, instr[4:3], instr[5], instr[2], instr[6], 4'b0, 5'h02, 3'b000, 5'h02, OPCODE_OPIMM};
+                rs1_enable = 1'b1;
               end else if (instr[11:7] == 5'b0) begin
                 // Hint -> lui x0, imm
                 instr_o.bus_resp.rdata = {{15 {instr[12]}}, instr[6:2], instr[11:7], OPCODE_LUI};
@@ -139,12 +159,16 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
                   // Reserved for future custom extensions (instr_o don't care)
                   instr_o.bus_resp.rdata = {1'b0, instr[10], 5'b0, instr[6:2], 2'b01, instr[9:7], 3'b101, 2'b01, instr[9:7], OPCODE_OPIMM};
                   illegal_instr_o = 1'b1;
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
                 end else begin
                   if (instr[6:2] == 5'b0) begin
                     // Hint
                     instr_o.bus_resp.rdata = {1'b0, instr[10], 5'b0, instr[6:2], 2'b01, instr[9:7], 3'b101, 2'b01, instr[9:7], OPCODE_OPIMM};
+                    rs1_enable = 1'b1;
                   end else begin
                     instr_o.bus_resp.rdata = {1'b0, instr[10], 5'b0, instr[6:2], 2'b01, instr[9:7], 3'b101, 2'b01, instr[9:7], OPCODE_OPIMM};
+                    rs1_enable = 1'b1;
                   end
                 end
               end
@@ -152,6 +176,7 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
               2'b10: begin
                 // c.andi -> andi rd, rd, imm
                 instr_o.bus_resp.rdata = {{6 {instr[12]}}, instr[12], instr[6:2], 2'b01, instr[9:7], 3'b111, 2'b01, instr[9:7], OPCODE_OPIMM};
+                rs1_enable = 1'b1;
               end
 
               2'b11: begin
@@ -159,21 +184,29 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
                   3'b000: begin
                     // c.sub -> sub rd', rd', rs2'
                     instr_o.bus_resp.rdata = {2'b01, 5'b0, 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b000, 2'b01, instr[9:7], OPCODE_OP};
+                    rs1_enable = 1'b1;
+                    rs2_enable = 1'b1;
                   end
 
                   3'b001: begin
                     // c.xor -> xor rd', rd', rs2'
                     instr_o.bus_resp.rdata = {7'b0, 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b100, 2'b01, instr[9:7], OPCODE_OP};
+                    rs1_enable = 1'b1;
+                    rs2_enable = 1'b1;
                   end
 
                   3'b010: begin
                     // c.or  -> or  rd', rd', rs2'
                     instr_o.bus_resp.rdata = {7'b0, 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b110, 2'b01, instr[9:7], OPCODE_OP};
+                    rs1_enable = 1'b1;
+                    rs2_enable = 1'b1;
                   end
 
                   3'b011: begin
                     // c.and -> and rd', rd', rs2'
                     instr_o.bus_resp.rdata = {7'b0, 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b111, 2'b01, instr[9:7], OPCODE_OP};
+                    rs1_enable = 1'b1;
+                    rs2_enable = 1'b1;
                   end
 
                   3'b100,
@@ -182,8 +215,9 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
                   3'b111: begin
                     // 100: c.subw
                     // 101: c.addw
-                    instr_o.bus_resp.rdata = {7'b0, 2'b01, instr[4:2], 2'b01, instr[9:7], 3'b111, 2'b01, instr[9:7], OPCODE_OP};
                     illegal_instr_o = 1'b1;
+                    rs1_enable = 1'b1;
+                    rs2_enable = 1'b1;
                   end
                 endcase
               end
@@ -194,6 +228,8 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
             // 0: c.beqz -> beq rs1', x0, imm
             // 1: c.bnez -> bne rs1', x0, imm
             instr_o.bus_resp.rdata = {{4 {instr[12]}}, instr[6:5], instr[2], 5'b0, 2'b01, instr[9:7], 2'b00, instr[13], instr[11:10], instr[4:3], instr[12], OPCODE_BRANCH};
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
         endcase
       end
@@ -206,13 +242,17 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
               // Reserved for future extensions (instr_o don't care)
               instr_o.bus_resp.rdata = {7'b0, instr[6:2], instr[11:7], 3'b001, instr[11:7], OPCODE_OPIMM};
               illegal_instr_o = 1'b1;
+              rs1_enable = 1'b1;
+              rs2_enable = 1'b1;
             end else begin
               if ((instr[6:2] == 5'b0) || (instr[11:7] == 5'b0)) begin
                 // Hint -> slli rd, rd, shamt
                 instr_o.bus_resp.rdata = {7'b0, instr[6:2], instr[11:7], 3'b001, instr[11:7], OPCODE_OPIMM};
+                rs1_enable = 1'b1;
               end else begin
                 // c.slli -> slli rd, rd, shamt
                 instr_o.bus_resp.rdata = {7'b0, instr[6:2], instr[11:7], 3'b001, instr[11:7], OPCODE_OPIMM};
+                rs1_enable = 1'b1;
               end
             end
           end
@@ -220,7 +260,13 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
           3'b010: begin
             // c.lwsp -> lw rd, imm(x2)
             instr_o.bus_resp.rdata = {4'b0, instr[3:2], instr[12], instr[6:4], 2'b00, 5'h02, 3'b010, instr[11:7], OPCODE_LOAD};
-            if (instr[11:7] == 5'b0)  illegal_instr_o = 1'b1;
+            if (instr[11:7] == 5'b0) begin
+              illegal_instr_o = 1'b1;
+              rs1_enable = 1'b1;
+              rs2_enable = 1'b1;
+            end else begin
+              rs1_enable = 1'b1;
+            end
           end
 
           3'b100: begin
@@ -229,14 +275,24 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
                 // c.jr -> jalr x0, rd/rs1, 0
                 instr_o.bus_resp.rdata = {12'b0, instr[11:7], 3'b0, 5'b0, OPCODE_JALR};
                 // c.jr with rs1 = 0 is reserved
-                if (instr[11:7] == 5'b0) illegal_instr_o = 1'b1;
+                if (instr[11:7] == 5'b0) begin
+                  illegal_instr_o = 1'b1;
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
+                end else begin
+                  rs1_enable = 1'b1;
+                end
               end else begin
                 if (instr[11:7] == 5'b0) begin
                   // Hint -> add x0, x0, rs2
                   instr_o.bus_resp.rdata = {7'b0, instr[6:2], 5'b0, 3'b0, instr[11:7], OPCODE_OP};
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
                 end else begin
                   // c.mv -> add rd, x0, rs2
                   instr_o.bus_resp.rdata = {7'b0, instr[6:2], 5'b0, 3'b0, instr[11:7], OPCODE_OP};
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
                 end
               end
             end else begin
@@ -247,14 +303,19 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
                 end else begin
                   // c.jalr -> jalr x1, rs1, 0
                   instr_o.bus_resp.rdata = {12'b0, instr[11:7], 3'b000, 5'b00001, OPCODE_JALR};
+                  rs1_enable = 1'b1;
                 end
               end else begin
                 if (instr[11:7] == 5'b0) begin
                   // Hint -> add x0, x0, rs2
                   instr_o.bus_resp.rdata = {7'b0, instr[6:2], instr[11:7], 3'b0, instr[11:7], OPCODE_OP};
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
                 end else begin
                   // c.add -> add rd, rd, rs2
                   instr_o.bus_resp.rdata = {7'b0, instr[6:2], instr[11:7], 3'b0, instr[11:7], OPCODE_OP};
+                  rs1_enable = 1'b1;
+                  rs2_enable = 1'b1;
                 end
               end
             end
@@ -263,14 +324,17 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
           3'b110: begin
             // c.swsp -> sw rs2, imm(x2)
             instr_o.bus_resp.rdata = {4'b0, instr[8:7], instr[12], instr[6:2], 5'h02, 3'b010, instr[11:9], 2'b00, OPCODE_STORE};
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
 
           3'b001,        // c.fldsp -> fld rd, imm(x2)
           3'b011,        // c.flwsp -> flw rd, imm(x2)
           3'b101,        // c.fsdsp -> fsd rs2, imm(x2)
           3'b111: begin  // c.fswsp -> fsw rs2, imm(x2)
-            instr_o.bus_resp.rdata = {4'b0, instr[3:2], instr[12], instr[6:4], 2'b00, 5'h02, 3'b010, instr[11:7], OPCODE_LOAD};
             illegal_instr_o = 1'b1;
+            rs1_enable = 1'b1;
+            rs2_enable = 1'b1;
           end
         endcase
       end
@@ -278,6 +342,10 @@ module cv32e40x_compressed_decoder import cv32e40x_pkg::*;
       default: begin
         // 32 bit (or more) instruction
         instr_o.bus_resp.rdata = instr_i.bus_resp.rdata;
+
+        rs1_enable = 1'b1;
+        rs2_enable = 1'b1;
+
       end
     endcase
   end
