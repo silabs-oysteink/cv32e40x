@@ -308,6 +308,7 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
         // Deassert rf_we in case of illegal csr instruction or
         // when the first half of a misaligned/split LSU goes to WB.
         // Also deassert if CSR was accepted both by eXtension if and pipeline
+        // TODO: Could suppress rf_we if rd == x0 to save power
         ex_wb_pipe_o.rf_we       <= (csr_is_illegal    ||
                                     lsu_split_i)       ? 1'b0 : id_ex_pipe_i.rf_we;
         ex_wb_pipe_o.lsu_en      <= id_ex_pipe_i.lsu_en;

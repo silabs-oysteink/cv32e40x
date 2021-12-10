@@ -291,6 +291,7 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   we are not allowed to take interrupts, and we will re-enter debug mode after finishing the LSU.
   Interrupt will then be taken when we enter the next step.
   */
+  // TODO: remove pending_Debug from below and add it in where pending_single_step is evaluated
   assign pending_single_step = (!debug_mode_q && dcsr_i.step && (wb_valid_i || ctrl_fsm_o.irq_ack)) && !pending_debug;
 
   // Regular debug will kill insn in WB, do not allow if LSU is not interruptible, a fence.i handshake is taking place

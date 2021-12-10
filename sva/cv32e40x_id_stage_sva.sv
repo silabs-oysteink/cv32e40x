@@ -49,7 +49,8 @@ module cv32e40x_id_stage_sva
   input logic           id_ready_o,
   input logic           id_valid_o,
   input ctrl_fsm_t      ctrl_fsm_i,
-  input logic           xif_insn_accept
+  input logic           xif_insn_accept,
+  input logic [1:0]     rf_re
 );
 
 
@@ -128,13 +129,29 @@ module cv32e40x_id_stage_sva
                       (ctrl_fsm_i.kill_id)
                       |-> (id_ready_o && !id_valid_o))
       else `uvm_error("id_stage", "Kill should imply ready and not valid")
-  /*
-  // Predecoded rs1/2_enable shall always equal rf_re from the main decoder
-  a_predecoded_rf_re :
+  
+  // TODO: These may not be 100% correct in case
+  // some instr bits are not clocked, and illegal insn would not be detected for example
+  //   Could use full decoder in sva, and give it ungated instruction words
+  // If decoder sets rf_re[0], if_id_pipe_i.rs1_enable must also be set
+  a_predecoded_rf_re_0 :
   assert property (@(posedge clk) disable iff (!rst_n)
-                    (if_valid_i && id_ready_o) |=> rf_re == {if_id_pipe_i.rs2_enable, if_id_pipe_i.rs1_enable})
-    else `uvm_error("id_stage", "Predecoded rf_re does not match decoder rf_re")
-  */
+                    (rf_re[0] && if_id_pipe_i.instr_valid |-> if_id_pipe_i.rs1_enable))
+    else `uvm_error("id_stage", "Predecoded rf_re[0] does not match decoder rf_re[0]")
+
+  // If decoder sets rf_re[0], if_id_pipe_i.rs1_enable must also be set
+  a_predecoded_rf_re_1 :
+  assert property (@(posedge clk) disable iff (!rst_n)
+                    (rf_re[1] && if_id_pipe_i.instr_valid |-> if_id_pipe_i.rs2_enable))
+    else `uvm_error("id_stage", "Predecoded rf_re[0] does not match decoder rf_re[0]")
+  
+  // Illegal instruction must read all operands
+  a_illegal_rs_enable:
+  assert property (@(posedge clk) disable iff (!rst_n)
+                    illegal_insn |->
+                    (if_id_pipe_i.rs1_enable && if_id_pipe_i.rs2_enable))
+    else `uvm_error ("id_stage", "Operands not enabled for illegal instruction")
+
   // rs2_enable can only be 1 if rs1_enable is also 1
   a_rs2_and_rs1 :
   assert property (@(posedge clk) disable iff (!rst_n)
