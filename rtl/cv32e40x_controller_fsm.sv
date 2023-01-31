@@ -211,6 +211,9 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   logic [2:0] debug_cause_n;
   logic [2:0] debug_cause_q;
 
+  // Cause of synchronous debug entry (trigger (including extrigger) and ebreak)
+  logic [2:0] sync_debug_cause;
+
   // Flop for remembering causes of wakeup
   logic       woke_to_debug_q;
   logic       woke_to_interrupt_q;
@@ -484,9 +487,12 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   assign sync_debug_allowed = !xif_in_wb;
 
   // Debug pending for any other synchronous reason than single step
-  assign pending_sync_debug = (trigger_match_in_wb) ||
+  // WB stage may be killed while a synchronous debug reason is in WB, in this case a higher priority event has taken place
+  // and thus there will be no pending_sync_debug.
+  assign pending_sync_debug = ((trigger_match_in_wb) ||
                               (ebreak_in_wb && dcsr_i.ebreakm && (ex_wb_pipe_i.priv_lvl == PRIV_LVL_M) && !debug_mode_q) || // Ebreak with dcsr.ebreakm==1  during machine mode
-                              (ebreak_in_wb && debug_mode_q); // Ebreak during debug_mode restarts execution from dm_halt_addr, as a regular debug entry without CSR updates.
+                              (ebreak_in_wb && debug_mode_q)) && // Ebreak during debug_mode restarts execution from dm_halt_addr, as a regular debug entry without CSR updates.
+                              !ctrl_fsm_o.kill_wb;
 
   // Debug pending for external debug request, only if not already in debug mode
   // Ideally the !debug_mode_q below should be factored into async_debug_allowed, but
@@ -508,10 +514,13 @@ module cv32e40x_controller_fsm import cv32e40x_pkg::*;
   // 4: trigger match (0x2)
   // 5: ebreak (0x1)
   // 6: single step (0x4)
+  assign sync_debug_cause = (trigger_match_in_wb || etrigger_in_wb)                                                    ? DBG_CAUSE_TRIGGER :    // Etrigger will enter DEBUG_TAKEN as a single step (no halting), but kill pipeline as non-stepping entries.
+                            (ebreak_in_wb && dcsr_i.ebreakm && (ex_wb_pipe_i.priv_lvl == PRIV_LVL_M) && !debug_mode_q) ? DBG_CAUSE_EBREAK  :    // Ebreak during machine mode
+                            (ebreak_in_wb && debug_mode_q)                                                             ? DBG_CAUSE_EBREAK  :    // Ebreak during debug mode
+                                                                                                                         DBG_CAUSE_NONE;
+
   assign debug_cause_n = (pending_async_debug && async_debug_allowed)                                               ? DBG_CAUSE_HALTREQ :
-                         (trigger_match_in_wb || etrigger_wb_i)                                                     ? DBG_CAUSE_TRIGGER :    // Etrigger will enter DEBUG_TAKEN as a single step (no halting), but kill pipeline as non-stepping entries.
-                         (ebreak_in_wb && dcsr_i.ebreakm && (ex_wb_pipe_i.priv_lvl == PRIV_LVL_M) && !debug_mode_q) ? DBG_CAUSE_EBREAK  :    // Ebreak during machine mode
-                         (ebreak_in_wb && debug_mode_q)                                                             ? DBG_CAUSE_EBREAK  :    // Ebreak during debug mode
+                         (pending_sync_debug && sync_debug_allowed)                                                 ? sync_debug_cause  :
                          (pending_single_step && single_step_allowed)                                               ? DBG_CAUSE_STEP    : DBG_CAUSE_NONE;
 
 
