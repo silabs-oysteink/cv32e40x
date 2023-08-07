@@ -54,7 +54,8 @@ module cv32e40x_div import cv32e40x_pkg::*;
     input logic                div_en_i,
 
     // Input handshake
-    input logic                valid_i,
+    input  logic               halt_i,
+    input  logic               valid_i,
     output logic               ready_o,
 
     // Output handshake and result
@@ -269,8 +270,8 @@ module cv32e40x_div import cv32e40x_pkg::*;
 
     endcase
 
-    // Allow kill at any time
-    if (!valid_i) begin
+    // Allow kill at any time unless EX stage is halted
+    if (!valid_i && !halt_i) begin
       next_state = DIV_IDLE;
       ready_o    = 1'b1;
       valid_o    = 1'b0;

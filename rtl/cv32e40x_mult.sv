@@ -30,6 +30,7 @@ module cv32e40x_mult import cv32e40x_pkg::*;
   input  logic        rst_n,
 
   input  logic        valid_i,
+  input  logic        halt_i,
   input  mul_opcode_e operator_i,
 
   // integer and short multiplier
@@ -115,7 +116,7 @@ module cv32e40x_mult import cv32e40x_pkg::*;
     mulh_acc_next    = mulh_acc;
 
     // Case statement assumes valid_i = 1; the valid_i = 0 scenario
-    // is handled after the case statement.    
+    // is handled after the case statement.
     case (mulh_state)
       MUL_ALBL: begin
         if (operator_i == MUL_H) begin
@@ -163,8 +164,8 @@ module cv32e40x_mult import cv32e40x_pkg::*;
       default: ;
     endcase
 
-    // Allow kill at any time
-    if (!valid_i) begin
+    // Allow kill at any time unless EX stage is halted
+    if (!valid_i && !halt_i) begin
       mulh_state_next = MUL_ALBL;
       ready_o = 1'b1;
       valid_o = 1'b0;

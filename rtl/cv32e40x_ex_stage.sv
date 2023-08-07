@@ -126,11 +126,10 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
 
   assign instr_valid = id_ex_pipe_i.instr_valid && !ctrl_fsm_i.kill_ex && !ctrl_fsm_i.halt_ex;
 
-  // todo: consider not factoring halt_ex into the mul/div/lsu_en_gated below
-  //       Halting EX currently reset state of these units. The IF stage sequencer is _not_ reset on a halt_if.
-  //       Maybe we need to split out valid and halt into the submodules?
-  assign mul_en_gated = id_ex_pipe_i.mul_en && instr_valid; // Factoring in instr_valid to kill mul instructions on kill/halt
-  assign div_en_gated = id_ex_pipe_i.div_en && instr_valid; // Factoring in instr_valid to kill div instructions on kill/halt
+  // The multiplier and divider takes halt_ex as a separate input. The valids below are only used to kill mul/div instructions
+  // whenever the EX stage is not halted.
+  assign mul_en_gated = id_ex_pipe_i.mul_en && instr_valid; // Factoring in instr_valid to kill mul instructions on kill
+  assign div_en_gated = id_ex_pipe_i.div_en && instr_valid; // Factoring in instr_valid to kill div instructions on kill
   assign lsu_en_gated = id_ex_pipe_i.lsu_en && instr_valid; // Factoring in instr_valid to suppress bus transactions on kill/halt
 
   assign div_en = id_ex_pipe_i.div_en && id_ex_pipe_i.instr_valid; // Valid DIV in EX, not affected by kill/halt
@@ -254,6 +253,7 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
          .div_en_i           ( div_en                               ),
 
          // Handshakes
+         .halt_i             ( ctrl_fsm_i.halt_ex                   ),
          .valid_i            ( div_en_gated                         ),
          .ready_o            ( div_ready                            ),
          .valid_o            ( div_valid                            ),
@@ -301,6 +301,7 @@ module cv32e40x_ex_stage import cv32e40x_pkg::*;
          .result_o        ( mul_result                    ),
 
          // Handshakes
+         .halt_i          ( ctrl_fsm_i.halt_ex            ),
          .valid_i         ( mul_en_gated                  ),
          .ready_o         ( mul_ready                     ),
          .valid_o         ( mul_valid                     ),
